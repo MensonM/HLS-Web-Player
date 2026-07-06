@@ -33,3 +33,7 @@
 校验配置再启动：
 ```bash
 mediamtx.exe --config-test mediamtx.yml
+
+# AI开发辅助说明
+- 本项目完整播放器页面、实时码率API逻辑、分片缓冲自动重试容错、URL分享功能均由豆包AI辅助生成；
+- 全部代码经过人工修改、测试、适配MediaMTX 1.19.2，修复兼容性bug，所有业务逻辑由人工把控。
