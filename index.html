@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>视频直播</title>
+    <script src="hls.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background-color: #11141b;
+            color: #eef2f9;
+            padding: 12px;
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+        h2 {
+            margin-bottom: 16px;
+            color: #ffffff;
+            font-size: 20px;
+        }
+        .tip-info {
+            background: #192941;
+            border: 1px solid #2b62b3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #b3d8ff;
+        }
+        .control-box {
+            background: #1c222e;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .input-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 14px;
+        }
+        label {
+            font-size: 13px;
+            color: #b0b8c4;
+        }
+        input {
+            height: 40px;
+            padding: 0 10px;
+            background: #262d3b;
+            border: 1px solid #384256;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #348bff;
+        }
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            margin-bottom:10px;
+        }
+        button {
+            height: 44px;
+            padding: 0 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            flex: 1;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button:disabled {
+            opacity:0.5;
+            cursor:not-allowed;
+        }
+        #playBtn {
+            background-color: #257dff;
+            color: white;
+        }
+        #stopBtn {
+            background-color: #e53e3e;
+            color: white;
+        }
+        #copyUrlBtn {
+            background: #23a55a;
+            color: #fff;
+        }
+        #clearLogBtn{
+            background:#666;
+            color:#fff;
+        }
+        .video-wrap {
+            width: 100%;
+            background: #000000;
+            border-radius: 10px;
+            overflow: hidden;
+            min-height: 240px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        #videoPlayer {
+            width: 100%;
+            display: block;
+        }
+        .empty-hint {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888888;
+            font-size: 14px;
+            padding: 10px;
+            text-align: center;
+        }
+        .res-info{
+            margin-bottom:12px;
+            color:#76d867;
+        }
+        .log-container {
+            background: #0e1118;
+            padding: 10px;
+            border-radius: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-error { color: #ff7a7a; }
+        .log-success { color: #76d867; }
+        .log-warn { color: #ffcb45; }
+        @media screen and (max-width: 768px) {
+            body { padding: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <h2>视频直播</h2>
+
+    <div class="tip-info">
+        电脑端支持火狐、微软Edge浏览器，移动端支持安卓手机、苹果手机自带浏览器。
+    </div>
+
+    <div class="control-box">
+        <div class="input-item">
+            <label>视频地址</label>
+            <input id="fullUrlInput" placeholder="http://x.x.x.x:8888/live/index.m3u8" value="">
+        </div>
+        <div class="btn-group">
+            <button id="playBtn">开始播放</button>
+            <button id="stopBtn">停止播放</button>
+            <button id="copyUrlBtn">复制视频地址</button>
+            <button id="clearLogBtn">清空日志</button>
+        </div>
+    </div>
+
+    <div class="video-wrap">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="empty-hint" id="emptyTip">输入视频地址后点击播放 / 回车</div>
+    </div>
+
+    <div class="res-info">视频分辨率：<span id="resText">等待加载视频</span></div>
+
+    <label>运行日志：</label>
+    <div class="log-container" id="logBox"></div>
+
+<script>
+// 全局缓存DOM，减少重复查询
+const dom = {
+    video: document.getElementById('videoPlayer'),
+    fullUrlInput: document.getElementById('fullUrlInput'),
+    playBtn: document.getElementById('playBtn'),
+    stopBtn: document.getElementById('stopBtn'),
+    copyUrlBtn: document.getElementById('copyUrlBtn'),
+    clearLogBtn: document.getElementById('clearLogBtn'),
+    emptyTip: document.getElementById('emptyTip'),
+    logBox: document.getElementById('logBox'),
+    resText: document.getElementById('resText')
+};
+
+let hlsPlayer = null;
+let isPlaying = false;
+const MAX_LOG_COUNT = 50;
+
+// 日志打印
+function log(text, type = "normal") {
+    const line = document.createElement("div");
+    if (type === "error") line.className = "log-error";
+    if (type === "success") line.className = "log-success";
+    if (type === "warn") line.className = "log-warn";
+    line.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+    dom.logBox.appendChild(line);
+    // 限制日志条数
+    while (dom.logBox.children.length > MAX_LOG_COUNT) {
+        dom.logBox.removeChild(dom.logBox.firstChild);
+    }
+    dom.logBox.scrollTop = dom.logBox.scrollHeight;
+}
+
+// 更新分辨率显示
+function updateResolution(videoEl) {
+    const w = videoEl.videoWidth;
+    const h = videoEl.videoHeight;
+    if (w && h) {
+        dom.resText.textContent = `${w} × ${h}`;
+        log(`当前视频分辨率：${w} × ${h}`, "success");
+    } else {
+        dom.resText.textContent = "未获取";
+    }
+}
+
+// 销毁播放器，释放内存
+function destroyPlayer() {
+    if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+    }
+    dom.video.removeAttribute('src');
+    dom.video.srcObject = null;
+    dom.emptyTip.style.display = "flex";
+    dom.resText.textContent = "等待加载流";
+    isPlaying = false;
+    dom.playBtn.disabled = false;
+    log("已停止播放，资源释放完成", "success");
+}
+
+// 判断iOS
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+// 清空日志
+dom.clearLogBtn.addEventListener('click', () => {
+    dom.logBox.innerHTML = '';
+});
+
+// 复制分享链接
+dom.copyUrlBtn.addEventListener('click', async () => {
+    const raw = dom.fullUrlInput.value.trim();
+    if (!raw) {
+        log("请先填写播放地址", "error");
+        return;
+    }
+    const pageUrl = location.origin + location.pathname;
+    const shareUrl = `${pageUrl}?stream=${encodeURIComponent(raw)}`;
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        log("分享链接复制成功", "success");
+    } catch (err) {
+        log("复制失败，请手动复制：" + shareUrl, "warn");
+    }
+});
+
+// 输入框回车播放
+dom.fullUrlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !isPlaying) {
+        dom.playBtn.click();
+    }
+});
+
+// 视频元数据加载后更新分辨率
+dom.video.addEventListener('loadedmetadata', function() {
+    updateResolution(this);
+});
+
+// 停止按钮
+dom.stopBtn.addEventListener('click', destroyPlayer);
+
+// 页面关闭销毁
+window.addEventListener('beforeunload', destroyPlayer);
+
+// 页面初始化读取URL参数
+window.onload = () => {
+    const params = new URLSearchParams(location.search);
+    const stream = params.get('stream');
+    if (stream) {
+        dom.fullUrlInput.value = decodeURIComponent(stream);
+        log("自动读取URL携带的视频地址", "success");
+    }
+};
+
+// 播放按钮核心逻辑
+dom.playBtn.addEventListener('click', () => {
+    if (isPlaying) return;
+    const url = dom.fullUrlInput.value.trim();
+    if (!url) {
+        log("播放地址不能为空", "error");
+        return;
+    }
+
+    destroyPlayer();
+    isPlaying = true;
+    dom.playBtn.disabled = true;
+    dom.emptyTip.style.display = "none";
+    log("开始加载流：" + url);
+    const video = dom.video;
+
+    // iOS原生HLS
+    if (isIOS()) {
+        video.src = url;
+        video.play().catch(err => {
+            log("iOS自动播放拦截，请点击视频画面", "warn");
+        });
+        log("iOS使用系统原生视频直播", "success");
+        return;
+    }
+
+    // Windows / Android / Firefox 使用完整版hls.min.js
+    if (Hls.isSupported()) {
+        hlsPlayer = new Hls({
+            enableWorker: true,
+            lowLatencyMode: false,
+            maxBufferLength: 20,
+            maxMaxBufferLength: 30,
+            bufferSize: 10000000,
+            maxBufferHole: 2,
+            stallMaxBufferLevel: 15,
+            fragLoadingTimeOut: 18000,
+            manifestLoadingTimeOut: 18000,
+        });
+
+        hlsPlayer.loadSource(url);
+        hlsPlayer.attachMedia(video);
+
+        hlsPlayer.on(Hls.Events.BUFFER_LOADING, () => {
+            log("正在预加载视频缓冲", "warn");
+        });
+
+        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+            log("M3U8清单解析完成", "success");
+            video.play().catch(() => {
+                log("浏览器自动播放限制，点击画面播放", "warn");
+            });
+            setTimeout(() => updateResolution(video), 600);
+        });
+
+        hlsPlayer.on(Hls.Events.ERROR, (evt, data) => {
+            log(`加载异常：${data.details}`, "error");
+            
+            // 缓冲区阻塞，自动恢复缓冲
+            if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+                log("缓冲区阻塞，自动尝试恢复缓冲", "warn");
+                hlsPlayer.startLoad();
+                return;
+            }
+            
+            // 分片加载失败：自动重试，不直接销毁播放器
+            if (data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+                data.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT) {
+                    log("分片加载失败，自动重试拉取分片", "warn");
+                    hlsPlayer.startLoad();
+                    // 非致命错误，不执行销毁
+                    return;
+            }
+            
+            // 只有真正致命错误才停止播放
+            if (data.fatal) {
+                destroyPlayer();
+            }
+        });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.play();
+        log("浏览器视频直播", "success");
+    } else {
+        log("当前浏览器不支持视频直播，请更新浏览器", "error");
+        destroyPlayer();
+    }
+});
+</script>
+</body>
+</html>
