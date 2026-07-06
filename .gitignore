@@ -1,0 +1,24 @@
+# MediaMTX binaries & runtime files
+mediamtx.exe
+mediamtx
+*.log
+*.tmp
+*.cache
+
+# Compressed archives
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Temp screenshot & local test files
+*.png
+!screenshot.png
