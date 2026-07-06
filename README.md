@@ -1,7 +1,7 @@
 # HLS-Web-Player
-A self-hosted offline HLS monitor player for MediaMTX, featuring real-time bitrate stats via MediaMTX API, automatic buffer error recovery, shareable streaming links and full LAN offline support.
-适配MediaMTX 1.19.2 的内网HLS监控网页播放器
-内置MTX API实时入流码率、分辨率显示、自动缓冲容错、一键分享链接、运行日志，完美兼容OBS SRT推流。
+- A self-hosted offline HLS monitor player for MediaMTX, featuring real-time bitrate stats via MediaMTX API, automatic buffer error recovery, shareable streaming links and full LAN offline support.
+- 适配MediaMTX的内网HLS监控网页播放器
+- 内置MTX API实时入流码率、分辨率显示、自动缓冲容错、一键分享链接、运行日志，完美兼容OBS SRT推流。
 
 ## 功能特性
 - 纯静态HTML，仅需托管在MediaMTX hlsDirectory或简易http服务
