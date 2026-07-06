@@ -27,8 +27,7 @@
 ### 1. MediaMTX 配置
 将仓库内 `mediamtx.yml.example` 复制重命名为 `mediamtx.yml`
 关键配置说明：
-- 开启API跨域，用于读取实时流量码率
-- 开启hlsDirectory托管网页
+- 开启API跨域，用于读取分辨率
 - SRT、HLS跨域全部放行局域网访问
 
 校验配置再启动：
